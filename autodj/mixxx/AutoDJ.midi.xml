@@ -1,0 +1,400 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MixxxControllerPreset mixxxVersion="2.4" schemaVersion="1">
+  <info>
+    <name>AutoDJ Virtual Bridge</name>
+    <author>AutoDJ</author>
+    <description>Two-way virtual MIDI bridge for AutoDJ Python backend. Requires loopMIDI ports AutoDJ_OUT (input) and AutoDJ_IN (output).</description>
+  </info>
+  <controller id="AutoDJ_OUT">
+    <scriptfiles>
+      <file functionprefix="AutoDJ" filename="AutoDJ_script.js"/>
+    </scriptfiles>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         INPUTS: Python → Mixxx commands (MIDI channel 1 = 0xB0/0x90)
+         ═══════════════════════════════════════════════════════════════ -->
+    <controls>
+
+      <!-- ── Crossfader (CC 1, 0-127 → -1.0 to 1.0) ── -->
+      <control>
+        <group>[Master]</group>
+        <key>crossfader</key>
+        <status>0xB0</status>
+        <midino>1</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck A volume (CC 2) ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>volume</key>
+        <status>0xB0</status>
+        <midino>2</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck B volume (CC 3) ── -->
+      <control>
+        <group>[Channel2]</group>
+        <key>volume</key>
+        <status>0xB0</status>
+        <midino>3</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck A EQ: HI (CC 10), MID (CC 11), LO (CC 12) ── -->
+      <!-- parameter3=HI, parameter2=MID, parameter1=LO in Mixxx's 3-band EQ effect -->
+      <control>
+        <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+        <key>parameter3</key>
+        <status>0xB0</status>
+        <midino>10</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+        <key>parameter2</key>
+        <status>0xB0</status>
+        <midino>11</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[EqualizerRack1_[Channel1]_Effect1]</group>
+        <key>parameter1</key>
+        <status>0xB0</status>
+        <midino>12</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck B EQ: HI (CC 20), MID (CC 21), LO (CC 22) ── -->
+      <control>
+        <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+        <key>parameter3</key>
+        <status>0xB0</status>
+        <midino>20</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+        <key>parameter2</key>
+        <status>0xB0</status>
+        <midino>21</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[EqualizerRack1_[Channel2]_Effect1]</group>
+        <key>parameter1</key>
+        <status>0xB0</status>
+        <midino>22</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck A/B QuickEffect filter sweep meta-knob (CC 30/31) ── -->
+      <!-- 0.5 = neutral (no filter), 0 = full LPF, 1 = full HPF -->
+      <control>
+        <group>[QuickEffectRack1_[Channel1]]</group>
+        <key>super1</key>
+        <status>0xB0</status>
+        <midino>30</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[QuickEffectRack1_[Channel2]]</group>
+        <key>super1</key>
+        <status>0xB0</status>
+        <midino>31</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Deck A/B pitch/tempo rate fader — 14-bit (MSB CC 6/7, LSB CC 16/17) ──
+           A 7-bit rate CC only gives ~128 steps across the full rate range —
+           coarser than the beatmatch engine's BPM tolerance, so it would
+           bottom out on the wrong step and never converge. 14-bit gives
+           16384 steps, same technique Mixxx's own controllers use for pitch
+           faders (see e.g. Denon MC4000.midi.xml). Manual beatmatching:
+           beatmatch_engine.py drives this directly, beatsync (below) is now
+           an emergency fallback only. ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>rate</key>
+        <status>0xB0</status>
+        <midino>6</midino>
+        <options><fourteen-bit-msb/></options>
+      </control>
+      <control>
+        <group>[Channel1]</group>
+        <key>rate</key>
+        <status>0xB0</status>
+        <midino>16</midino>
+        <options><fourteen-bit-lsb/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>rate</key>
+        <status>0xB0</status>
+        <midino>7</midino>
+        <options><fourteen-bit-msb/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>rate</key>
+        <status>0xB0</status>
+        <midino>17</midino>
+        <options><fourteen-bit-lsb/></options>
+      </control>
+
+      <!-- ── Deck A/B temporary pitch nudge (momentary, held while Note ON) ──
+           Notes 60/61 = nudge up A/B, 62/63 = nudge down A/B. Mirrors a real
+           DJ pushing/pulling a platter to walk phase into alignment. ── -->
+      <control><group>[Channel1]</group><key>rate_temp_up</key><status>0x90</status><midino>60</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>rate_temp_up</key><status>0x80</status><midino>60</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>rate_temp_up</key><status>0x90</status><midino>61</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>rate_temp_up</key><status>0x80</status><midino>61</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>rate_temp_down</key><status>0x90</status><midino>62</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>rate_temp_down</key><status>0x80</status><midino>62</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>rate_temp_down</key><status>0x90</status><midino>63</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>rate_temp_down</key><status>0x80</status><midino>63</midino><options><button/></options></control>
+
+      <!-- ── Headphone / PFL cueing (human-in-the-loop monitoring) ──
+           Notes 64/65 = PFL toggle deck A/B. CC 8 = headMix balance
+           (0=master only, 1=cue only). CC 9 = headGain. Note 66 = headSplit
+           toggle (mono split cue). ── -->
+      <control><group>[Channel1]</group><key>pfl</key><status>0x90</status><midino>64</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>pfl</key><status>0x90</status><midino>65</midino><options><button/></options></control>
+      <control><group>[Master]</group><key>headMix</key><status>0xB0</status><midino>8</midino><options><normal/></options></control>
+      <control><group>[Master]</group><key>headGain</key><status>0xB0</status><midino>9</midino><options><normal/></options></control>
+      <control><group>[Master]</group><key>headSplit</key><status>0x90</status><midino>66</midino><options><button/></options></control>
+
+      <!-- ── Deck A/B playposition seek (CC 50/51, for cue/jump) ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>playposition</key>
+        <status>0xB0</status>
+        <midino>50</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>playposition</key>
+        <status>0xB0</status>
+        <midino>51</midino>
+        <options><normal/></options>
+      </control>
+
+      <!-- ── Track id staging: CC 45 = high 7 bits, CC 46 = low 7 bits ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>AutoDJ.trackIdHighByte</key>
+        <status>0xB0</status>
+        <midino>45</midino>
+        <options><Script-Binding/></options>
+      </control>
+      <control>
+        <group>[Channel1]</group>
+        <key>AutoDJ.trackIdLowByte</key>
+        <status>0xB0</status>
+        <midino>46</midino>
+        <options><Script-Binding/></options>
+      </control>
+
+      <!-- ── Deck A/B Play (Note ON 1/2 = play, Note OFF 1/2 = stop) ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>play</key>
+        <status>0x90</status>
+        <midino>1</midino>
+        <options><button/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>play</key>
+        <status>0x90</status>
+        <midino>2</midino>
+        <options><button/></options>
+      </control>
+      <control>
+        <group>[Channel1]</group>
+        <key>play</key>
+        <status>0x80</status>
+        <midino>1</midino>
+        <options><button/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>play</key>
+        <status>0x80</status>
+        <midino>2</midino>
+        <options><button/></options>
+      </control>
+
+      <!-- ── Deck A/B BeatSync (Note ON 10/11) ──
+           Emergency fallback only — beatmatch_engine.py drives rate/
+           rate_temp_up/down for normal manual matching. ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>beatsync</key>
+        <status>0x90</status>
+        <midino>10</midino>
+        <options><button/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>beatsync</key>
+        <status>0x90</status>
+        <midino>11</midino>
+        <options><button/></options>
+      </control>
+
+      <!-- ── Deck A/B Keylock toggle (Note ON 20/21) ── -->
+      <control>
+        <group>[Channel1]</group>
+        <key>keylock</key>
+        <status>0x90</status>
+        <midino>20</midino>
+        <options><button/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>keylock</key>
+        <status>0x90</status>
+        <midino>21</midino>
+        <options><button/></options>
+      </control>
+
+      <!-- ── Commit staged track id to Deck A/B (Note ON 30/31) ── -->
+      <!-- Fires the native [ChannelN],load_track_by_id control (AutoDJ fork) -->
+      <control>
+        <group>[Channel1]</group>
+        <key>AutoDJ.loadToDeckA</key>
+        <status>0x90</status>
+        <midino>30</midino>
+        <options><Script-Binding/></options>
+      </control>
+      <control>
+        <group>[Channel2]</group>
+        <key>AutoDJ.loadToDeckB</key>
+        <status>0x90</status>
+        <midino>31</midino>
+        <options><Script-Binding/></options>
+      </control>
+
+      <!-- ═══ Performance vocabulary (showmanship engine) ═══ -->
+
+      <!-- ── Beatloop activate: Deck A notes 40-44, Deck B notes 45-49 ──
+           40/45=0.25 beat, 41/46=0.5, 42/47=1, 43/48=2, 44/49=4 -->
+      <control><group>[Channel1]</group><key>beatloop_0.25_activate</key><status>0x90</status><midino>40</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>beatloop_0.5_activate</key><status>0x90</status><midino>41</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>beatloop_1_activate</key><status>0x90</status><midino>42</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>beatloop_2_activate</key><status>0x90</status><midino>43</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>beatloop_4_activate</key><status>0x90</status><midino>44</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>beatloop_0.25_activate</key><status>0x90</status><midino>45</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>beatloop_0.5_activate</key><status>0x90</status><midino>46</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>beatloop_1_activate</key><status>0x90</status><midino>47</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>beatloop_2_activate</key><status>0x90</status><midino>48</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>beatloop_4_activate</key><status>0x90</status><midino>49</midino><options><button/></options></control>
+
+      <!-- ── Loop exit (reloop_toggle): Note 50/51 ── -->
+      <control><group>[Channel1]</group><key>reloop_toggle</key><status>0x90</status><midino>50</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>reloop_toggle</key><status>0x90</status><midino>51</midino><options><button/></options></control>
+
+      <!-- ── FX unit enables: unit 1 = Echo, unit 2 = Reverb (configure once in
+           Mixxx's FX racks). Notes 55/56 = unit1→deck A/B, 57/58 = unit2→A/B ── -->
+      <control><group>[EffectRack1_EffectUnit1]</group><key>group_[Channel1]_enable</key><status>0x90</status><midino>55</midino><options><button/></options></control>
+      <control><group>[EffectRack1_EffectUnit1]</group><key>group_[Channel2]_enable</key><status>0x90</status><midino>56</midino><options><button/></options></control>
+      <control><group>[EffectRack1_EffectUnit2]</group><key>group_[Channel1]_enable</key><status>0x90</status><midino>57</midino><options><button/></options></control>
+      <control><group>[EffectRack1_EffectUnit2]</group><key>group_[Channel2]_enable</key><status>0x90</status><midino>58</midino><options><button/></options></control>
+
+      <!-- ── FX unit knobs: CC 32/33 = unit1/2 super (metaknob), CC 34/35 = unit1/2 dry/wet ── -->
+      <control><group>[EffectRack1_EffectUnit1]</group><key>super1</key><status>0xB0</status><midino>32</midino><options><normal/></options></control>
+      <control><group>[EffectRack1_EffectUnit2]</group><key>super1</key><status>0xB0</status><midino>33</midino><options><normal/></options></control>
+      <control><group>[EffectRack1_EffectUnit1]</group><key>mix</key><status>0xB0</status><midino>34</midino><options><normal/></options></control>
+      <control><group>[EffectRack1_EffectUnit2]</group><key>mix</key><status>0xB0</status><midino>35</midino><options><normal/></options></control>
+
+      <!-- ── Hotcues 1-4: Deck A set 70-73 / activate 74-77, Deck B set 80-83 / activate 84-87 ── -->
+      <control><group>[Channel1]</group><key>hotcue_1_set</key><status>0x90</status><midino>70</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_2_set</key><status>0x90</status><midino>71</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_3_set</key><status>0x90</status><midino>72</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_4_set</key><status>0x90</status><midino>73</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_1_activate</key><status>0x90</status><midino>74</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_2_activate</key><status>0x90</status><midino>75</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_3_activate</key><status>0x90</status><midino>76</midino><options><button/></options></control>
+      <control><group>[Channel1]</group><key>hotcue_4_activate</key><status>0x90</status><midino>77</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_1_set</key><status>0x90</status><midino>80</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_2_set</key><status>0x90</status><midino>81</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_3_set</key><status>0x90</status><midino>82</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_4_set</key><status>0x90</status><midino>83</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_1_activate</key><status>0x90</status><midino>84</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_2_activate</key><status>0x90</status><midino>85</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_3_activate</key><status>0x90</status><midino>86</midino><options><button/></options></control>
+      <control><group>[Channel2]</group><key>hotcue_4_activate</key><status>0x90</status><midino>87</midino><options><button/></options></control>
+
+      <!-- ── Spinback / brake (script: engine.spinback/brake physics) ──
+           Note ON starts the effect, Note OFF releases it.
+           90/92 = spinback A/B, 91/93 = brake A/B -->
+      <control><group>[Channel1]</group><key>AutoDJ.spinbackA</key><status>0x90</status><midino>90</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel1]</group><key>AutoDJ.spinbackA</key><status>0x80</status><midino>90</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel1]</group><key>AutoDJ.brakeA</key><status>0x90</status><midino>91</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel1]</group><key>AutoDJ.brakeA</key><status>0x80</status><midino>91</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel2]</group><key>AutoDJ.spinbackB</key><status>0x90</status><midino>92</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel2]</group><key>AutoDJ.spinbackB</key><status>0x80</status><midino>92</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel2]</group><key>AutoDJ.brakeB</key><status>0x90</status><midino>93</midino><options><Script-Binding/></options></control>
+      <control><group>[Channel2]</group><key>AutoDJ.brakeB</key><status>0x80</status><midino>93</midino><options><Script-Binding/></options></control>
+
+    </controls>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         OUTPUTS: Mixxx → Python state (MIDI channel 2 = 0x91/0xB1)
+         Declarative outputs push control changes as MIDI on AutoDJ_IN.
+         High-frequency data (playposition, BPM) is sent by the script timer.
+         ═══════════════════════════════════════════════════════════════ -->
+    <outputs>
+
+      <!-- Deck A play indicator (Note ON/OFF, note 1) -->
+      <output>
+        <group>[Channel1]</group>
+        <key>play_indicator</key>
+        <status>0x91</status>
+        <midino>1</midino>
+        <on>0x7F</on>
+        <off>0x00</off>
+        <minimum>0.5</minimum>
+        <maximum>1.0</maximum>
+      </output>
+
+      <!-- Deck B play indicator (Note ON/OFF, note 2) -->
+      <output>
+        <group>[Channel2]</group>
+        <key>play_indicator</key>
+        <status>0x91</status>
+        <midino>2</midino>
+        <on>0x7F</on>
+        <off>0x00</off>
+        <minimum>0.5</minimum>
+        <maximum>1.0</maximum>
+      </output>
+
+      <!-- Deck A/B sync state (Note ON/OFF, notes 10/11) -->
+      <output>
+        <group>[Channel1]</group>
+        <key>sync_enabled</key>
+        <status>0x91</status>
+        <midino>10</midino>
+        <on>0x7F</on>
+        <off>0x00</off>
+        <minimum>0.5</minimum>
+        <maximum>1.0</maximum>
+      </output>
+      <output>
+        <group>[Channel2]</group>
+        <key>sync_enabled</key>
+        <status>0x91</status>
+        <midino>11</midino>
+        <on>0x7F</on>
+        <off>0x00</off>
+        <minimum>0.5</minimum>
+        <maximum>1.0</maximum>
+      </output>
+
+    </outputs>
+  </controller>
+</MixxxControllerPreset>

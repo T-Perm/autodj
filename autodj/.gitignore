@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+autodj.db
+music/
+tags/
+sets/
