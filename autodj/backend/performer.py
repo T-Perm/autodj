@@ -283,6 +283,54 @@ class _DoubleDrop(_DropTimed):
         ctx.set_volume(ctx.b, 1.0)
 
 
+_MOVE_ACTIONS = {
+    "kill_bass":    lambda ctx, deck: ctx.set_eq(deck, "lo", 0.0),
+    "bring_bass":   lambda ctx, deck: ctx.set_eq(deck, "lo", 0.75),
+    "swap_mids":    lambda ctx, deck: ctx.set_eq(deck, "mid", 0.75),
+    "swap_highs":   lambda ctx, deck: ctx.set_eq(deck, "hi", 0.75),
+    "open_filter":  lambda ctx, deck: ctx.set_filter(deck, 0.5),
+    "close_filter": lambda ctx, deck: ctx.set_filter(deck, 0.15),
+    "fx_send":      lambda ctx, deck: (ctx.fx_enable(1, deck, on=True),
+                                       ctx.fx_mix(1, 0.6)),
+}
+
+
+class _LLMDirectedFlavor(Flavor):
+
+    def __init__(self, moves: list[dict]):
+        self._moves = moves
+        self._fired: set[int] = set()
+
+    def _fire_due(self, ctx: FlavorCtx, current_bar: float):
+        for i, mv in enumerate(self._moves):
+            if i in self._fired or mv["at_bar"] > current_bar:
+                continue
+            self._fired.add(i)
+            deck = ctx.a if mv["deck"] == "a" else ctx.b
+            if mv["move"] == "loop_extend":
+                ctx.beatloop(deck, 1)
+                asyncio.create_task(self._exit_loop_later(ctx, deck))
+            else:
+                _MOVE_ACTIONS[mv["move"]](ctx, deck)
+
+    async def _exit_loop_later(self, ctx: FlavorCtx, deck: str):
+        await ctx.sleep(ctx.bar_s)
+        ctx.loop_exit(deck)
+
+    async def on_enter(self, ctx: FlavorCtx):
+        self._fire_due(ctx, 0.0)
+
+    def during_ride(self, ctx: FlavorCtx, frac: float):
+        self._fire_due(ctx, frac * ctx.phases["build"])
+
+    async def on_swap(self, ctx: FlavorCtx):
+        self._fire_due(ctx, ctx.phases["build"] + 0.5)
+
+    async def on_tail(self, ctx: FlavorCtx) -> bool:
+        self._fire_due(ctx, ctx.bars)
+        return False
+
+
 FLAVORS: dict[str, type] = {
     "beatmatch_crossfade": Flavor,
     "filter_sweep":        _FilterSweep,
