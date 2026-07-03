@@ -4,6 +4,7 @@ from typing import Optional, Callable
 from sqlmodel import select
 from models import Track
 from brain import decide_next, get_compatible_candidates
+from mix_timeline import validate_timeline, pick_fallback_method, TimelineError
 from beatgrid import BeatGrid, snap_phrase_ms, PHRASE_BEATS
 from beatmatch_engine import BeatmatchEngine
 from pacing import PACE_MODES, blend_bars_range, clamp_blend_bars, mix_out_at_ms
@@ -109,6 +110,14 @@ class QueueManager:
                     chosen["transition_duration_bars"] = result.get("transition_duration_bars", 8)
                     chosen["entry_point"]              = result.get("entry_point", "intro")
                     chosen["reasoning"]                = result.get("reasoning", "")
+                    try:
+                        chosen["moves"] = validate_timeline(
+                            result.get("blend_method"), result.get("moves"),
+                            chosen["transition_duration_bars"])
+                        chosen["blend_method"] = result["blend_method"]
+                    except (TimelineError, KeyError):
+                        chosen["blend_method"] = pick_fallback_method(self.now_playing, chosen)
+                        chosen["moves"] = []
                     return chosen
                 else:
                     print(f"[Brain] LLM picked unknown id {track_id!r}, falling back to rule-based pick")
@@ -123,6 +132,9 @@ class QueueManager:
         chosen["transition_duration_bars"] = clamp_blend_bars(self.pace_mode, self.vibe, 8)
         chosen["entry_point"]              = "intro"
         chosen["reasoning"]                = ""
+        chosen["blend_method"] = (pick_fallback_method(self.now_playing, chosen)
+                                  if self.now_playing else "crossfader")
+        chosen["moves"] = []
         return chosen
 
     def _pick_fallback_track(self, options: list[dict]) -> dict:
@@ -400,6 +412,8 @@ class QueueManager:
                 self.active_deck, self.inactive_deck, next_track,
                 style, bars, self.personality.chaos,
                 blend_start_ms=blend_start_ms,
+                blend_method=next_track.get("blend_method"),
+                moves=next_track.get("moves") or None,
             )
         else:
             await asyncio.sleep(0.1)

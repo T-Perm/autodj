@@ -187,7 +187,8 @@ async def run_flow():
 
         performed = {}
         async def fake_perform(a, b, next_track, style, bars, chaos,
-                               blend_start_ms=None):
+                               blend_start_ms=None, blend_method=None,
+                               moves=None):
             performed.update(a=a, b=b, style=style, bars=bars,
                              blend_start_ms=blend_start_ms,
                              b_playing=midi.deck_state[b]["playing"])
