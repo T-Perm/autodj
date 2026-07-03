@@ -114,6 +114,7 @@ class Flavor:
 
 
 class _FilterSweep(Flavor):
+    blend_method = "filter_blend"
     async def on_enter(self, ctx):
         ctx.set_filter(ctx.b, 0.70)
 
@@ -214,6 +215,7 @@ class _ReverseCrash(Flavor):
 
 class _AcapellaSwap(Flavor):
     builds_body = False
+    blend_method = "eq_swap"
     async def on_enter(self, ctx):
         ctx.set_eq(ctx.b, "hi", 0.0)
         ctx.set_eq(ctx.b, "mid", 0.3)
