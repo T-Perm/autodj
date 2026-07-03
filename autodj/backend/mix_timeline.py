@@ -18,6 +18,10 @@ def validate_timeline(blend_method: str, moves: list, duration_bars: int) -> lis
         raise TimelineError(f"unknown blend_method {blend_method!r}")
     if not isinstance(moves, list) or not moves:
         raise TimelineError("moves must be a non-empty list")
+    try:
+        duration_bars = float(duration_bars)
+    except (TypeError, ValueError):
+        raise TimelineError(f"non-numeric duration_bars {duration_bars!r}")
 
     cleaned = []
     saw_bass_handoff = False
