@@ -108,6 +108,9 @@ class Flavor:
     async def on_tail(self, ctx: FlavorCtx) -> bool:
         return False
 
+    def cancel_pending(self):
+        pass
+
 
 
 class _FilterSweep(Flavor):
@@ -300,6 +303,7 @@ class _LLMDirectedFlavor(Flavor):
     def __init__(self, moves: list[dict]):
         self._moves = moves
         self._fired: set[int] = set()
+        self._loop_tasks: list[asyncio.Task] = []
 
     def _fire_due(self, ctx: FlavorCtx, current_bar: float):
         for i, mv in enumerate(self._moves):
@@ -309,7 +313,8 @@ class _LLMDirectedFlavor(Flavor):
             deck = ctx.a if mv["deck"] == "a" else ctx.b
             if mv["move"] == "loop_extend":
                 ctx.beatloop(deck, 1)
-                asyncio.create_task(self._exit_loop_later(ctx, deck))
+                self._loop_tasks.append(
+                    asyncio.create_task(self._exit_loop_later(ctx, deck)))
             else:
                 _MOVE_ACTIONS[mv["move"]](ctx, deck)
 
@@ -329,6 +334,12 @@ class _LLMDirectedFlavor(Flavor):
     async def on_tail(self, ctx: FlavorCtx) -> bool:
         self._fire_due(ctx, ctx.bars)
         return False
+
+    def cancel_pending(self):
+        for t in self._loop_tasks:
+            if not t.done():
+                t.cancel()
+        self._loop_tasks.clear()
 
 
 FLAVORS: dict[str, type] = {
@@ -396,6 +407,7 @@ class Performer:
         finally:
             if self._monitor:
                 self._monitor.cancel()
+            flavor.cancel_pending()
             await self._finish_ramp(a, b, bar_s)
 
         return {
