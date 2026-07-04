@@ -1,1 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Runtime data & secrets (never shipped)
+.env
+autodj.db
+music/
+tags/
+sets/
+
+# PyInstaller build output
+build/
+dist/
+
+# Local dev tooling / session state (not part of the project)
 .worktrees/

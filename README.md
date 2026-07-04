@@ -51,12 +51,17 @@ Stock Mixxx's controller API can only load "whatever row is selected in the libr
 
 **3. Get an NVIDIA API key and add it to `.env`:**
 
-Sign up at [build.nvidia.com](https://build.nvidia.com), grab an API key, then in `backend/.env`:
+Sign up at [build.nvidia.com](https://build.nvidia.com), grab an API key, then create a `.env` file in the project root:
 
 ```
 NVIDIA_API_KEY=your-key-here
 NVIDIA_MODEL=meta/llama-3.1-8b-instruct
+MUSIC_DIR=../music
+DB_PATH=./autodj.db
 ```
+
+(`MUSIC_DIR` and `DB_PATH` are resolved from `backend\`, where the app runs -
+`..\music` is the `music/` folder at the project root.)
 
 **4. Install Python dependencies:**
 
@@ -64,6 +69,20 @@ NVIDIA_MODEL=meta/llama-3.1-8b-instruct
 cd backend
 pip install -r requirements.txt
 ```
+
+**4b. (Optional) Build a standalone `.exe`** so the machine running the set doesn't
+need Python or the dependencies installed:
+
+```
+build_exe.bat
+```
+
+This bundles the backend and everything it imports (librosa, the LLM client, the
+MIDI bridge, TTS) into `dist\autodj\autodj.exe` via PyInstaller. It's a one-dir
+build - ship the whole `dist\autodj\` folder, run `autodj.exe` inside it. Your
+`.env` is copied next to the exe (edit it there to change the API key or paths);
+your music library and Mixxx itself stay external. `start.bat` prefers the exe
+automatically when it exists and falls back to `python autodj.py` when it doesn't.
 
 **5. Load the Mixxx preset:**
 
@@ -90,24 +109,50 @@ In Mixxx: Library -> Add folder -> select your music folder. This gives every
 track a Mixxx database id, which is how AutoDJ addresses tracks. No crate,
 no sorting requirements - sort the library however you like.
 
-**7. Drop music in `backend/music/`** (or point `MUSIC_DIR` in `.env` somewhere else)
+**7. Drop music in `music/`** at the project root (or point `MUSIC_DIR` in `.env` somewhere else)
 
 ---
 
 ## Running it
 
-```
-start.bat
-```
+Once the one-time setup above is done, every session is:
 
-This launches the patched Mixxx (if not already running), then the backend. Or manually:
+**1. Start loopMIDI** and confirm the `AutoDJ_OUT` and `AutoDJ_IN` ports are present
+   (it usually remembers them from setup - just launch the app).
+
+**2. Double-click `start.bat`** in the `autodj\` folder.
+
+   It does the rest in order:
+   - launches the patched Mixxx if it isn't already running (waits ~15s for it to load);
+   - runs the backend from `backend\` - the `dist\autodj\autodj.exe` build if you made
+     one, otherwise `python autodj.py`.
+
+**3. Watch the terminal.** On first run (or after adding songs) AutoDJ analyzes each
+   new track with librosa - that's a one-time, per-track cost cached in `autodj.db`, so
+   later starts are instant. Then it matches your library against Mixxx's, connects over
+   MIDI, invents a persona, loads the first track to Deck A, and starts playing.
+
+**4. Drive it from the terminal** with the commands in the [Controls](#controls) table
+   (`vibe`, `pace`, `skip`, `status`, `cue A`/`cue B`, `review on`, ...), or just let it
+   run autonomously.
+
+**5. Type `quit`** to stop cleanly - it writes an in-character set recap to `sets\`.
+
+### Running it manually (instead of `start.bat`)
+
+Start Mixxx yourself, then from the `autodj\` folder:
 
 ```
 cd backend
-python autodj.py
+python autodj.py                  &rem  from source
+..\dist\autodj\autodj.exe         &rem  or the built exe
 ```
 
-AutoDJ scans your library, matches it against Mixxx's library, connects over MIDI, loads the first track to Deck A, and starts playing. Everything from there is automatic.
+Run from `backend\` either way, so the relative paths in `.env` (`MUSIC_DIR=..\music`,
+`DB_PATH=.\autodj.db`) resolve correctly.
+
+Optional flags (source or exe): `--vibe chill|hype|chaotic` sets the opening mood,
+`--music <path>` overrides the library folder for that run.
 
 ---
 
@@ -178,37 +223,41 @@ The crossfader sits hard on the active deck's side the whole time, so the deck b
 
 ## Project structure
 
+The repo root *is* the project - clone it and everything below is right there:
+
 ```
-autodj/
-  backend/
-    autodj.py           - entry point, terminal loop, Mixxx id-map join
-    queue_manager.py    - orchestrator: wires director/personality/performer together
-    performer.py        - blend spine + flavor layers + recovery reflex
-    director.py         - LLM set-arc planner (phases + scheduled moments)
-    personality.py      - chaos meter, boredom, sabotage rolls, session persona
-    announcer.py        - TTS drop tags played over a ducked mix
-    set_report.py       - session journal + in-character set recap
-    beatgrid.py         - Python-side beat + 32-beat phrase clock (dead-reckoned between MIDI polls)
-    pacing.py           - rotation speed: when to leave each track, how long blends overlap
-    beatmatch_engine.py - manual tempo/phase matching (rate fader + nudge control loops)
-    verify_beatmatch.py - offline convergence check for the beatmatch engine (no Mixxx needed)
-    verify_phrasing.py  - offline check of phrase math, pacing, and the preload flow
-    midi_controller.py  - MIDI I/O bridge to Mixxx
-    mixxx_db.py         - read-only reader for Mixxx's library DB
-    brain.py            - LLM track selection
-    analyzer.py         - librosa audio analysis (BPM, key, energy, beat grid, drop)
-    models.py           - Track schema (SQLModel)
-    database.py         - SQLite setup
-    music/              - drop audio files here
-    tags/               - rendered TTS drop lines (auto-created, cached)
-  sets/                - post-set recaps, one per session (auto-created)
-  mixxx/
-    AutoDJ.midi.xml    - Mixxx controller mapping
-    AutoDJ_script.js   - Mixxx controller script (telemetry relay + id decoder)
-  .env                 - NVIDIA_API_KEY, NVIDIA_MODEL, MUSIC_DIR, DB_PATH
-  start.bat            - one-click start (Mixxx + backend)
-  build_mixxx.bat      - rebuild the patched Mixxx fork
-  BUILDING_MIXXX.md    - fork build + maintenance guide
+backend/
+  autodj.py           - entry point, terminal loop, Mixxx id-map join
+  queue_manager.py    - orchestrator: wires director/personality/performer together
+  performer.py        - blend spine + flavor layers + recovery reflex
+  director.py         - LLM set-arc planner (phases + scheduled moments)
+  personality.py      - chaos meter, boredom, sabotage rolls, session persona
+  announcer.py        - TTS drop tags played over a ducked mix
+  set_report.py       - session journal + in-character set recap
+  beatgrid.py         - Python-side beat + 32-beat phrase clock (dead-reckoned between MIDI polls)
+  pacing.py           - rotation speed: when to leave each track, how long blends overlap
+  beatmatch_engine.py - manual tempo/phase matching (rate fader + nudge control loops)
+  verify_beatmatch.py - offline convergence check for the beatmatch engine (no Mixxx needed)
+  verify_phrasing.py  - offline check of phrase math, pacing, and the preload flow
+  midi_controller.py  - MIDI I/O bridge to Mixxx
+  mixxx_db.py         - read-only reader for Mixxx's library DB
+  brain.py            - LLM track selection
+  analyzer.py         - librosa audio analysis (BPM, key, energy, beat grid, drop)
+  models.py           - Track schema (SQLModel)
+  database.py         - SQLite setup
+  requirements.txt    - Python dependencies
+  tags/               - rendered TTS drop lines (auto-created, cached)
+mixxx/
+  AutoDJ.midi.xml     - Mixxx controller mapping
+  AutoDJ_script.js    - Mixxx controller script (telemetry relay + id decoder)
+music/                - drop audio files here (path set by MUSIC_DIR in .env; git-ignored)
+sets/                 - post-set recaps, one per session (auto-created)
+.env                  - NVIDIA_API_KEY, NVIDIA_MODEL, MUSIC_DIR, DB_PATH (you create this)
+start.bat             - one-click start (Mixxx + backend, exe or source)
+build_exe.bat         - bundle the backend into a standalone dist\autodj\autodj.exe
+autodj.spec           - PyInstaller recipe (dynamic-import escapes for librosa/numba/TTS/MIDI)
+build_mixxx.bat       - rebuild the patched Mixxx fork
+BUILDING_MIXXX.md     - fork build + maintenance guide
 ```
 
 ---

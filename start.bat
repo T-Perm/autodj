@@ -18,5 +18,11 @@ if errorlevel 1 (
     echo Mixxx already running.
 )
 
+REM Prefer the standalone exe (build_exe.bat); fall back to Python source.
+REM Run from backend\ so .env, music\, and autodj.db resolve the same either way.
 cd /d "%~dp0backend"
-python autodj.py
+if exist "%~dp0dist\autodj\autodj.exe" (
+    "%~dp0dist\autodj\autodj.exe"
+) else (
+    python autodj.py
+)
