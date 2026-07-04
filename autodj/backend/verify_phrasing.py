@@ -9,6 +9,7 @@ from beatgrid import BeatGrid, snap_phrase_ms, PHRASE_BEATS
 from pacing import mix_out_at_ms, blend_bars_range, clamp_blend_bars
 from verify_beatmatch import FakeMidi
 from performer import Performer, FLAVORS, _phase_bars
+from mix_timeline import validate_timeline, TimelineError, pick_fallback_method, BLEND_METHODS
 
 
 
@@ -187,7 +188,8 @@ async def run_flow():
 
         performed = {}
         async def fake_perform(a, b, next_track, style, bars, chaos,
-                               blend_start_ms=None):
+                               blend_start_ms=None, blend_method=None,
+                               moves=None):
             performed.update(a=a, b=b, style=style, bars=bars,
                              blend_start_ms=blend_start_ms,
                              b_playing=midi.deck_state[b]["playing"])
@@ -217,19 +219,70 @@ async def run_flow():
             qm._preload_task.cancel()
 
 
+def check_mix_timeline():
+    moves = validate_timeline("eq_swap", [
+        {"at_bar": 3, "move": "bring_bass", "deck": "b"},
+        {"at_bar": 0, "move": "kill_bass", "deck": "a"},
+    ], duration_bars=8)
+    assert [m["move"] for m in moves] == ["kill_bass", "bring_bass"], \
+        "timeline not sorted by at_bar"
+
+    bad_cases = [
+        ("nonsense_method", [{"at_bar": 0, "move": "kill_bass", "deck": "a"}], 8),
+        ("eq_swap", [], 8),
+        ("eq_swap", [{"at_bar": 0, "move": "not_a_move", "deck": "a"}], 8),
+        ("eq_swap", [{"at_bar": 0, "move": "kill_bass", "deck": "c"}], 8),
+        ("eq_swap", [{"at_bar": 99, "move": "kill_bass", "deck": "a"}], 8),
+        ("eq_swap", [{"at_bar": 0, "move": "kill_bass", "deck": "a"}], 8),
+    ]
+    for method, mv, bars in bad_cases:
+        try:
+            validate_timeline(method, mv, bars)
+            assert False, f"expected TimelineError for {method}/{mv}/{bars}"
+        except TimelineError:
+            pass
+
+    assert pick_fallback_method(
+        {"bpm": 128, "genre_hint": "house"},
+        {"bpm": 129, "genre_hint": "house"}) == "eq_swap"
+    assert pick_fallback_method(
+        {"bpm": 90, "genre_hint": "hip-hop"},
+        {"bpm": 140, "genre_hint": "techno"}) == "crossfader"
+    print("[mix_timeline] validation + fallback method selection — OK")
+
+
 
 def assert_spine(midi: HarnessMidi, style: str, bars: int, bar_s: float,
-                 full_overlap: bool = True):
+                 full_overlap: bool = True, blend_method: str = "crossfader"):
     xf = midi.xf_trace
     assert xf, f"{style}: crossfader never moved"
     vals = [v for _, v in xf]
-    for prev, cur in zip(vals, vals[1:]):
-        assert cur >= prev - 1e-6, f"{style}: crossfader moved backwards"
-        assert cur - prev <= 0.15 + 1e-6, \
-            f"{style}: crossfader jumped {cur - prev:.2f} in one step — hard cut"
+
+    if blend_method == "crossfader":
+        for prev, cur in zip(vals, vals[1:]):
+            assert cur >= prev - 1e-6, f"{style}: crossfader moved backwards"
+            assert cur - prev <= 0.15 + 1e-6, \
+                f"{style}: crossfader jumped {cur - prev:.2f} in one step — hard cut"
+    else:
+        peak = vals[0]
+        assert 0.45 <= peak <= 0.55, \
+            f"{style}/{blend_method}: initial parked position {peak:.2f} not centered"
+        close_started = False
+        for prev, cur in zip(vals, vals[1:]):
+            assert cur >= prev - 1e-6, f"{style}: crossfader moved backwards"
+            if not close_started:
+                if abs(cur - peak) > 0.03:
+                    close_started = True
+                    assert cur - prev <= 0.20 + 1e-6, \
+                        f"{style}/{blend_method}: close-phase jump {cur - prev:.2f}"
+            else:
+                assert cur - prev <= 0.20 + 1e-6, \
+                    f"{style}/{blend_method}: crossfader jumped {cur - prev:.2f} in one step"
+        assert close_started, f"{style}/{blend_method}: crossfader never left its parked position"
+
     assert vals[-1] >= 0.99, f"{style}: crossfade never completed ({vals[-1]:.2f})"
 
-    if full_overlap:
+    if full_overlap and blend_method == "crossfader":
         build_bars = _phase_bars(bars)["build"]
         t_in = next(t for t, v in xf if v > 0.1)
         t_out = next(t for t, v in xf if v >= 0.9)
@@ -247,7 +300,9 @@ def assert_spine(midi: HarnessMidi, style: str, bars: int, bar_s: float,
 
 
 async def run_spine_case(style: str, bars: int = 4,
-                         bail_after_s: float | None = None) -> HarnessMidi:
+                         bail_after_s: float | None = None,
+                         blend_method: str = "crossfader",
+                         moves: list | None = None) -> HarnessMidi:
     midi = HarnessMidi({TRACK_A["id"]: TRACK_A,
                         TRACK_B_MATCHED["id"]: TRACK_B_MATCHED})
     grid = BeatGrid(midi)
@@ -271,7 +326,8 @@ async def run_spine_case(style: str, bars: int = 4,
         bail_task = asyncio.create_task(trip())
     try:
         outcome = await asyncio.wait_for(
-            perf.perform("A", "B", dict(TRACK_B_MATCHED), style, bars, 0.3),
+            perf.perform("A", "B", dict(TRACK_B_MATCHED), style, bars, 0.3,
+                        blend_method=blend_method, moves=moves),
             timeout=180)
     finally:
         tick.cancel()
@@ -280,7 +336,8 @@ async def run_spine_case(style: str, bars: int = 4,
 
     if bail_after_s is None:
         assert not outcome["bailed"], f"{style}: unexpectedly bailed in the harness"
-    assert_spine(midi, style, bars, bar_s, full_overlap=bail_after_s is None)
+    assert_spine(midi, style, bars, bar_s, full_overlap=bail_after_s is None,
+                blend_method=blend_method)
     return midi
 
 
@@ -289,10 +346,10 @@ async def run_spine_checks():
     print("[spine] clean blend: monotonic ramped crossfade, real overlap, "
           "silent outgoing exit — OK")
 
-    for style in FLAVORS:
+    for style, cls in FLAVORS.items():
         if style == "beatmatch_crossfade":
             continue
-        await run_spine_case(style, bars=4)
+        await run_spine_case(style, bars=4, blend_method=cls.blend_method)
     print(f"[flavors] all {len(FLAVORS)} styles hold the fluidity invariants — OK")
 
     midi = await run_spine_case("beatmatch_crossfade", bars=8, bail_after_s=3.0)
@@ -301,9 +358,25 @@ async def run_spine_checks():
     assert len(steps_after) >= 5, "bail exit was not ramped"
     print("[bail] recovery reflex exits through a ramp, never a slam — OK")
 
+    for method in ("eq_swap", "filter_blend"):
+        await run_spine_case("beatmatch_crossfade", bars=8, blend_method=method)
+    print("[blend_method] eq_swap/filter_blend park the crossfader until the "
+          "close phase — OK")
+
+    timeline = validate_timeline("eq_swap", [
+        {"at_bar": 0.0, "move": "kill_bass", "deck": "a"},
+        {"at_bar": 4.0, "move": "bring_bass", "deck": "b"},
+        {"at_bar": 4.5, "move": "swap_mids", "deck": "b"},
+        {"at_bar": 4.5, "move": "swap_highs", "deck": "b"},
+    ], duration_bars=8)
+    await run_spine_case("beatmatch_crossfade", bars=8,
+                         blend_method="eq_swap", moves=timeline)
+    print("[llm_timeline] validated move timeline holds the spine invariants — OK")
+
 
 def main():
     check_math()
+    check_mix_timeline()
     asyncio.run(run_flow())
     asyncio.run(run_spine_checks())
     print("PASS")

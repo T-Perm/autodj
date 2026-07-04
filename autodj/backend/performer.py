@@ -29,6 +29,14 @@ def risk_score(current: dict, nxt: dict, style: str) -> float:
     return min(risk, 1.0)
 
 
+_METHOD_CURVE = {
+    "crossfader":   {"peak": 0.55, "power": 1.6, "parked": False},
+    "eq_swap":      {"peak": 0.50, "power": 1.0, "parked": True},
+    "filter_blend": {"peak": 0.50, "power": 1.0, "parked": True},
+}
+DEFAULT_BLEND_METHOD = "crossfader"
+
+
 def _phase_bars(bars: int) -> dict:
     close = max(1, bars // 4)
     build = max(2, bars - 1 - close)
@@ -83,6 +91,7 @@ class Flavor:
 
     handles_swap = False
     builds_body = True
+    blend_method = "crossfader"
 
     async def on_prepare(self, ctx: FlavorCtx):
         pass
@@ -99,9 +108,13 @@ class Flavor:
     async def on_tail(self, ctx: FlavorCtx) -> bool:
         return False
 
+    def cancel_pending(self):
+        pass
+
 
 
 class _FilterSweep(Flavor):
+    blend_method = "filter_blend"
     async def on_enter(self, ctx):
         ctx.set_filter(ctx.b, 0.70)
 
@@ -202,6 +215,7 @@ class _ReverseCrash(Flavor):
 
 class _AcapellaSwap(Flavor):
     builds_body = False
+    blend_method = "eq_swap"
     async def on_enter(self, ctx):
         ctx.set_eq(ctx.b, "hi", 0.0)
         ctx.set_eq(ctx.b, "mid", 0.3)
@@ -274,6 +288,62 @@ class _DoubleDrop(_DropTimed):
         ctx.set_volume(ctx.b, 1.0)
 
 
+_MOVE_ACTIONS = {
+    "kill_bass":    lambda ctx, deck: ctx.set_eq(deck, "lo", 0.0),
+    "bring_bass":   lambda ctx, deck: ctx.set_eq(deck, "lo", 0.75),
+    "swap_mids":    lambda ctx, deck: ctx.set_eq(deck, "mid", 0.75),
+    "swap_highs":   lambda ctx, deck: ctx.set_eq(deck, "hi", 0.75),
+    "open_filter":  lambda ctx, deck: ctx.set_filter(deck, 0.5),
+    "close_filter": lambda ctx, deck: ctx.set_filter(deck, 0.15),
+    "fx_send":      lambda ctx, deck: (ctx.fx_enable(1, deck, on=True),
+                                       ctx.fx_mix(1, 0.6)),
+}
+
+
+class _LLMDirectedFlavor(Flavor):
+
+    def __init__(self, moves: list[dict]):
+        self._moves = moves
+        self._fired: set[int] = set()
+        self._loop_tasks: list[asyncio.Task] = []
+
+    def _fire_due(self, ctx: FlavorCtx, current_bar: float):
+        for i, mv in enumerate(self._moves):
+            if i in self._fired or mv["at_bar"] > current_bar:
+                continue
+            self._fired.add(i)
+            deck = ctx.a if mv["deck"] == "a" else ctx.b
+            if mv["move"] == "loop_extend":
+                ctx.beatloop(deck, 1)
+                self._loop_tasks.append(
+                    asyncio.create_task(self._exit_loop_later(ctx, deck)))
+            else:
+                _MOVE_ACTIONS[mv["move"]](ctx, deck)
+
+    async def _exit_loop_later(self, ctx: FlavorCtx, deck: str):
+        await ctx.sleep(ctx.bar_s)
+        ctx.loop_exit(deck)
+
+    async def on_enter(self, ctx: FlavorCtx):
+        self._fire_due(ctx, 0.0)
+
+    def during_ride(self, ctx: FlavorCtx, frac: float):
+        self._fire_due(ctx, frac * ctx.phases["build"])
+
+    async def on_swap(self, ctx: FlavorCtx):
+        self._fire_due(ctx, ctx.phases["build"] + 0.5)
+
+    async def on_tail(self, ctx: FlavorCtx) -> bool:
+        self._fire_due(ctx, ctx.bars)
+        return False
+
+    def cancel_pending(self):
+        for t in self._loop_tasks:
+            if not t.done():
+                t.cancel()
+        self._loop_tasks.clear()
+
+
 FLAVORS: dict[str, type] = {
     "beatmatch_crossfade": Flavor,
     "filter_sweep":        _FilterSweep,
@@ -309,7 +379,9 @@ class Performer:
 
     async def perform(self, a: str, b: str, next_track: dict, style: str,
                       bars: int, chaos: float,
-                      blend_start_ms: float | None = None) -> dict:
+                      blend_start_ms: float | None = None,
+                      blend_method: str | None = None,
+                      moves: list[dict] | None = None) -> dict:
         m = self.midi
         bpm = m.deck_state[a]["bpm"] or 120.0
         bar_s = (60.0 / bpm) * 4
@@ -324,19 +396,25 @@ class Performer:
         m.enable_keylock(b)
         m.set_deck_volume(b, 1.0)
 
-        flavor = (FLAVORS.get(style) or Flavor)()
+        if moves:
+            flavor = _LLMDirectedFlavor(moves)
+        else:
+            flavor = (FLAVORS.get(style) or Flavor)()
+        method = blend_method if blend_method in _METHOD_CURVE else flavor.blend_method
         self._reflex = (a, b, threshold) if reflex_on else None
         self._monitor = None
         try:
             await self._run_spine(a, b, next_track, bars, bar_s, chaos,
-                                  flavor, blend_start_ms)
+                                  flavor, blend_start_ms, method)
         finally:
             if self._monitor:
                 self._monitor.cancel()
+            flavor.cancel_pending()
             await self._finish_ramp(a, b, bar_s)
 
         return {
             "style": style,
+            "blend_method": method,
             "landed": not self._bailed,
             "bailed": self._bailed,
             "max_drift": round(self._max_drift, 3),
@@ -345,26 +423,34 @@ class Performer:
 
     async def _run_spine(self, a: str, b: str, nxt: dict, bars: int,
                          bar_s: float, chaos: float, flavor: Flavor,
-                         blend_start_ms: float | None):
+                         blend_start_ms: float | None,
+                         blend_method: str = DEFAULT_BLEND_METHOD):
         m = self.midi
         phases = _phase_bars(bars)
         ctx = FlavorCtx(self, a, b, nxt, bar_s, bars, chaos, phases)
+        curve = _METHOD_CURVE.get(blend_method, _METHOD_CURVE[DEFAULT_BLEND_METHOD])
 
         await flavor.on_prepare(ctx)
         await self._wait_until_ms(a, blend_start_ms)
 
         m.set_eq(b, "lo", 0.0)
+        if curve["parked"]:
+            m.set_eq(b, "mid", 0.0)
+            m.set_eq(b, "hi", 0.0)
+        self._play_if_stopped(b)
+        if curve["parked"]:
+            self._xf(b, curve["peak"])
         if flavor.builds_body:
             m.set_eq(b, "mid", 0.30)
             m.set_eq(b, "hi", 0.45)
-        self._play_if_stopped(b)
         if self._reflex:
             self._monitor = asyncio.create_task(self._watch_drift(*self._reflex))
         await flavor.on_enter(ctx)
 
         def build_step(frac):
-            eased = frac ** 1.6
-            self._xf(b, 0.55 * eased)
+            eased = frac ** curve["power"]
+            if not curve["parked"]:
+                self._xf(b, curve["peak"] * eased)
             if flavor.builds_body:
                 m.set_eq(b, "mid", 0.30 + 0.45 * eased)
                 m.set_eq(b, "hi", 0.45 + 0.30 * eased)
@@ -388,7 +474,7 @@ class Performer:
         if self._bailed:
             return
 
-        if not await self._xf_ramp(b, 0.55, 1.0, phases["close"] * bar_s):
+        if not await self._xf_ramp(b, curve["peak"], 1.0, phases["close"] * bar_s):
             return
 
         if not await flavor.on_tail(ctx):
