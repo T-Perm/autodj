@@ -434,12 +434,15 @@ class Performer:
         await self._wait_until_ms(a, blend_start_ms)
 
         m.set_eq(b, "lo", 0.0)
-        if flavor.builds_body:
-            m.set_eq(b, "mid", 0.30)
-            m.set_eq(b, "hi", 0.45)
+        if curve["parked"]:
+            m.set_eq(b, "mid", 0.0)
+            m.set_eq(b, "hi", 0.0)
         self._play_if_stopped(b)
         if curve["parked"]:
             self._xf(b, curve["peak"])
+        if flavor.builds_body:
+            m.set_eq(b, "mid", 0.30)
+            m.set_eq(b, "hi", 0.45)
         if self._reflex:
             self._monitor = asyncio.create_task(self._watch_drift(*self._reflex))
         await flavor.on_enter(ctx)
