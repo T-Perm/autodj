@@ -27,7 +27,7 @@ git checkout autodj-patch
 ```
 
 Download + unpack Mixxx's prebuilt dependency environment (~1.4 GB download,
-5.7 GB unpacked — this replaces hours of vcpkg compilation):
+5.7 GB unpacked - this replaces hours of vcpkg compilation):
 
 ```bat
 tools\windows_buildenv.bat setup
@@ -53,8 +53,8 @@ cmake --build C:\dev\mixxx\build --target mixxx
 ```
 
 First full build takes a few minutes (the heavy dependencies are prebuilt).
-Incremental rebuilds after touching the patch are ~1–3 minutes. Result:
-`C:\dev\mixxx\build\mixxx.exe` — this is what `start.bat` launches. After the
+Incremental rebuilds after touching the patch are ~1-3 minutes. Result:
+`C:\dev\mixxx\build\mixxx.exe` - this is what `start.bat` launches. After the
 first build, `build_mixxx.bat` in this folder wraps the rebuild step.
 
 ## Syncing with upstream Mixxx
@@ -65,14 +65,14 @@ git fetch upstream --tags
 git rebase <new-release-tag> autodj-patch
 ```
 
-Expect occasional conflicts in `src/mixer/playermanager.cpp/.h` — that's
+Expect occasional conflicts in `src/mixer/playermanager.cpp/.h` - that's
 where the patch lives. After any sync, re-verify:
 
 1. The patch still compiles and `load_track_by_id` still loads tracks.
 2. The `library`/`track_locations` schema query in `backend/mixxx_db.py`
    still matches Mixxx's DB (it's undocumented internal schema).
 3. The prebuilt buildenv name in `tools/windows_buildenv.bat` may have
-   changed — rerun `tools\windows_buildenv.bat setup` and reconfigure if so.
+   changed - rerun `tools\windows_buildenv.bat setup` and reconfigure if so.
 
 ## What the patch does
 
@@ -80,5 +80,5 @@ where the patch lives. After any sync, re-verify:
 `ControlObject` `[ChannelN],load_track_by_id`. When set to a positive integer
 (from a controller script or XML mapping), `slotLoadTrackByIdToPlayer` looks
 the id up via `TrackCollectionManager::getTrackById` and routes it through
-the standard `slotLoadTrackToPlayer` path with `play=false` — loading never
+the standard `slotLoadTrackToPlayer` path with `play=false` - loading never
 auto-starts playback; the Python backend owns all play/pause decisions.

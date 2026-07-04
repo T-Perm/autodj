@@ -10,7 +10,7 @@ TAGS_DIR = Path(__file__).parent / "tags"
 MIN_GAP_S = 120.0
 TAG_SECONDS_GUESS = 3.0
 
-LINES_PROMPT = 'You write spoken drop lines for a DJ set — the short shouted tags a\nhype DJ plays over the mix ("DJ SNAKE!", "are you ready!", "this one\'s dangerous").\n\nThe DJ persona tonight:\n{persona}\n\nWrite 8 lines in this persona\'s voice. Keep each under 10 words, punchy,\nspeakable. Cover these situations (one line each, in order):\n1. set_start   — opening the night\n2. name_drop   — just the DJ announcing itself\n3. hype        — generic energy raiser\n4. gamble_win  — it just landed a risky move and wants credit\n5. gamble_loss — it just botched a move and owns it\n6. moment      — right before a planned showpiece move\n7. phase_peak  — entering the peak of the set\n8. phase_cool  — bringing the energy down\n\nReturn JSON only: {{"set_start": "...", "name_drop": "...", "hype": "...",\n"gamble_win": "...", "gamble_loss": "...", "moment": "...",\n"phase_peak": "...", "phase_cool": "..."}}'
+LINES_PROMPT = 'You write spoken drop lines for a DJ set - the short shouted tags a\nhype DJ plays over the mix ("DJ SNAKE!", "are you ready!", "this one\'s dangerous").\n\nThe DJ persona tonight:\n{persona}\n\nWrite 8 lines in this persona\'s voice. Keep each under 10 words, punchy,\nspeakable. Cover these situations (one line each, in order):\n1. set_start   - opening the night\n2. name_drop   - just the DJ announcing itself\n3. hype        - generic energy raiser\n4. gamble_win  - it just landed a risky move and wants credit\n5. gamble_loss - it just botched a move and owns it\n6. moment      - right before a planned showpiece move\n7. phase_peak  - entering the peak of the set\n8. phase_cool  - bringing the energy down\n\nReturn JSON only: {{"set_start": "...", "name_drop": "...", "hype": "...",\n"gamble_win": "...", "gamble_loss": "...", "moment": "...",\n"phase_peak": "...", "phase_cool": "..."}}'
 
 FALLBACK_LINES = {
     "set_start":   "Buckle up. The machine is live.",
@@ -43,7 +43,7 @@ class Announcer:
         try:
             await asyncio.get_running_loop().run_in_executor(None, self._render_all)
         except Exception as e:
-            print(f"[announcer] TTS unavailable ({e}) — running silent")
+            print(f"[announcer] TTS unavailable ({e}) - running silent")
             self._enabled = False
 
     def _render_all(self):
@@ -72,7 +72,7 @@ class Announcer:
         if not force and not self.can_speak():
             return
         self._last_tag = time.monotonic()
-        print(f'   🎙  "{self.lines.get(kind, "")}"')
+        print(f'   [announcer] "{self.lines.get(kind, "")}"')
         try:
             import winsound
             winsound.PlaySound(str(wav), winsound.SND_FILENAME | winsound.SND_ASYNC)

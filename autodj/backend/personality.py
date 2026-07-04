@@ -19,7 +19,7 @@ ESCALATION = {
     "double_drop":         "double_drop",
 }
 
-PERSONA_PROMPT = 'Invent a DJ persona for tonight\'s set. You are an AI DJ with real\nshowmanship — cocky, risk-loving, a little unhinged, but genuinely skilled.\n\nReturn JSON only:\n{\n  "name": "<stage name, punchy, 1-3 words>",\n  "style": "<one sentence: how this DJ talks and behaves behind the decks>",\n  "catchphrase": "<a short signature line, under 8 words>"\n}'
+PERSONA_PROMPT = 'Invent a DJ persona for tonight\'s set. You are an AI DJ with real\nshowmanship - cocky, risk-loving, a little unhinged, but genuinely skilled.\n\nReturn JSON only:\n{\n  "name": "<stage name, punchy, 1-3 words>",\n  "style": "<one sentence: how this DJ talks and behaves behind the decks>",\n  "catchphrase": "<a short signature line, under 8 words>"\n}'
 
 FALLBACK_PERSONAS = [
     {"name": "Null Pointer", "style": "Deadpan menace who treats every trainwreck as intentional.", "catchphrase": "That was on purpose."},

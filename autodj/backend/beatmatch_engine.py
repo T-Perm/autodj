@@ -66,7 +66,7 @@ class BeatmatchEngine:
             self._lock_state[target] = True
             self._lock_quality[target] = g.drift_beats(reference, target)
             return True
-        print(f"[Beatmatch] Phase re-lock on deck {target} timed out — falling back to beatsync")
+        print(f"[Beatmatch] Phase re-lock on deck {target} timed out - falling back to beatsync")
         m.enable_sync(target)
         await asyncio.sleep(0.3)
         self._lock_state[target] = True
@@ -94,7 +94,7 @@ class BeatmatchEngine:
             self._lock_quality[target] = g.drift_beats(reference, target)
             return True
 
-        print(f"[Beatmatch] Manual match on deck {target} timed out — falling back to beatsync")
+        print(f"[Beatmatch] Manual match on deck {target} timed out - falling back to beatsync")
         m.enable_sync(target)
         await asyncio.sleep(0.3)
         self._lock_state[target] = True

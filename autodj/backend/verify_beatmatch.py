@@ -89,7 +89,7 @@ async def run_case(name: str, bpm_a: float, bpm_b: float, phase_offset_beats: fl
     drift = grid.drift_beats("A", "B")
     fell_back = bool(midi.sync_calls)
     status = "locked" if locked else "fell back to sync"
-    print(f"[{name}] {status} — bpm_err={bpm_err:.3f} drift={drift:.3f} beats "
+    print(f"[{name}] {status} - bpm_err={bpm_err:.3f} drift={drift:.3f} beats "
           f"fallback={fell_back}")
 
     assert locked == expect_lock, f"{name}: expected lock={expect_lock}, got {locked}"

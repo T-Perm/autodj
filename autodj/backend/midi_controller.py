@@ -55,7 +55,7 @@ class MidiController:
 
         self._out = mido.open_output(out_name)
         self._in  = mido.open_input(in_name, callback=self._on_midi_in)
-        print(f"[MIDI] Connected — OUT: {out_name!r}, listening on: {in_name!r}")
+        print(f"[MIDI] Connected - OUT: {out_name!r}, listening on: {in_name!r}")
 
     def close(self):
         if self._out:
@@ -155,17 +155,17 @@ class MidiController:
             return
         mixxx_id = self.mixxx_id_map.get(track_id)
         if mixxx_id is None:
-            print(f"[MIDI] Track {track_id!r} has no Mixxx id — import it into Mixxx's library first")
+            print(f"[MIDI] Track {track_id!r} has no Mixxx id - import it into Mixxx's library first")
             return
         if not 0 < mixxx_id <= 0x3FFF:
-            print(f"[MIDI] Mixxx id {mixxx_id} outside 14-bit range — cannot send")
+            print(f"[MIDI] Mixxx id {mixxx_id} outside 14-bit range - cannot send")
             return
 
         note = 30 if deck == "A" else 31
         self._out.send(mido.Message("control_change", channel=0, control=45, value=(mixxx_id >> 7) & 0x7F))
         self._out.send(mido.Message("control_change", channel=0, control=46, value=mixxx_id & 0x7F))
         self._out.send(mido.Message("note_on", channel=0, note=note, velocity=127))
-        print(f"[MIDI] Load deck {deck} ← Mixxx track id {mixxx_id} (track {track_id[:8]}…)")
+        print(f"[MIDI] Load deck {deck} <- Mixxx track id {mixxx_id} (track {track_id[:8]}...)")
 
 
     _LOOP_NOTES = {0.25: 0, 0.5: 1, 1: 2, 2: 3, 4: 4}

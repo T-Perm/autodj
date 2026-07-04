@@ -48,7 +48,7 @@ def validate_timeline(blend_method: str, moves: list, duration_bars: int) -> lis
 
     if not saw_bass_handoff:
         raise TimelineError(
-            "timeline never brings the incoming deck's bass in — no terminal handoff")
+            "timeline never brings the incoming deck's bass in - no terminal handoff")
 
     cleaned.sort(key=lambda mv: mv["at_bar"])
     return cleaned

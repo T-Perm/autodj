@@ -55,17 +55,17 @@ class QueueManager:
         if t == "track_changed":
             track = msg.get("track", {})
             bpm = track.get("bpm") or 0
-            print(f"\n▶  {track.get('artist')} — {track.get('title')}  [{bpm:.1f} BPM | {track.get('key')} | {track.get('mood')}]")
+            print(f"\n[now playing] {track.get('artist')} - {track.get('title')}  [{bpm:.1f} BPM | {track.get('key')} | {track.get('mood')}]")
         elif t == "transition_start":
             nxt = msg.get("next_track", {})
-            flag = "  ⚠ OFF-SCRIPT" if msg.get("sabotaged") else ""
-            print(f"   ⇌  {msg.get('style')} ({msg.get('duration_bars')} bars, risk {msg.get('risk', 0):.2f}){flag}  →  {nxt.get('title')}")
+            flag = "  [OFF-SCRIPT]" if msg.get("sabotaged") else ""
+            print(f"   [mix] {msg.get('style')} ({msg.get('duration_bars')} bars, risk {msg.get('risk', 0):.2f}){flag} -> {nxt.get('title')}")
         elif t == "brain_reasoning":
-            print(f"   🤖  {msg.get('text')}")
+            print(f"   [brain] {msg.get('text')}")
         elif t == "queue_update":
             queue = msg.get("queue", [])
             if queue:
-                titles = "  →  ".join(f"{t.get('title')}" for t in queue[:3])
+                titles = "  ->  ".join(f"{t.get('title')}" for t in queue[:3])
                 print(f"   up next: {titles}")
 
 
@@ -161,8 +161,8 @@ class QueueManager:
         if not self.midi:
             return False
         if track["id"] not in self.midi.mixxx_id_map:
-            print(f"[MIDI] {track.get('title')!r} not in Mixxx's library — cannot load. "
-                  f"Import it in Mixxx (Library → Add folder) and restart.")
+            print(f"[MIDI] {track.get('title')!r} not in Mixxx's library - cannot load. "
+                  f"Import it in Mixxx (Library -> Add folder) and restart.")
             return False
 
         self.midi.deck_state[deck]["duration_s"] = 0.0
@@ -188,9 +188,9 @@ class QueueManager:
         self.is_running = True
 
         persona = await self.personality.invent_persona()
-        print(f"\n🎧  Tonight on the decks: {persona.get('name')} — {persona.get('style')}")
+        print(f"\nTonight on the decks: {persona.get('name')} - {persona.get('style')}")
         await self.director.plan_set(self._get_all_tracks(), self.vibe)
-        phases = " → ".join(p["name"] for p in self.director.plan["phases"])
+        phases = " -> ".join(p["name"] for p in self.director.plan["phases"])
         print(f"   set plan: {phases}")
         if self.announcer:
             await self.announcer.prepare(persona)
@@ -225,7 +225,7 @@ class QueueManager:
     async def on_mixxx_state(self, deck_state: dict):
         if not self._midi_feedback_seen:
             self._midi_feedback_seen = True
-            print("[MIDI] Receiving playposition from Mixxx ✓")
+            print("[MIDI] Receiving playposition from Mixxx (ok)")
         if self._transition_active or not self.is_running or not self.now_playing:
             return
         if not self.up_next:
@@ -313,7 +313,7 @@ class QueueManager:
                                              bar_s=(60.0 / bpm) * 4)
         self.midi.pause(deck)
         self._preloaded = {"id": nxt["id"], "ready": True}
-        print(f"   📀  prepped on deck {deck}: {nxt.get('title')!r} "
+        print(f"   [preload] prepped on deck {deck}: {nxt.get('title')!r} "
               f"(tempo matched, cued at {self._entry_ms(nxt) / 1000:.0f}s)")
 
 
@@ -356,14 +356,14 @@ class QueueManager:
             await self._broadcast({"type": "brain_reasoning", "text": next_track["reasoning"]})
 
         if self.review_mode:
-            print(f"   ⏸  review: {style} → {next_track.get('title')!r} queued. "
+            print(f"   [review] {style} -> {next_track.get('title')!r} queued. "
                   f"Type 'go' to commit or 'skip' to veto.")
             self._review_event.clear()
             self.review_pending = True
             await self._review_event.wait()
             self.review_pending = False
             if self._review_action == "skip":
-                print("   ⏭  vetoed — staying on current track.")
+                print("   [review] vetoed - staying on current track.")
                 self._transition_active = False
                 return
 
@@ -382,7 +382,7 @@ class QueueManager:
             if not prepped:
                 loaded = await self._load_and_verify(self.inactive_deck, next_track)
                 if not loaded:
-                    print(f"[MIDI] Transition aborted — Deck {self.inactive_deck} "
+                    print(f"[MIDI] Transition aborted - Deck {self.inactive_deck} "
                           f"did not load {next_track.get('title')!r}. Staying on current track.")
                     self._transition_active = False
                     return
@@ -390,12 +390,12 @@ class QueueManager:
                     locked = await self.beatmatch.start_match(
                         self.inactive_deck, self.active_deck, timeout_s=10.0)
                     if not locked:
-                        print(f"   🎛  manual match fell back to sync on deck {self.inactive_deck}")
+                        print(f"   [beatmatch] manual match fell back to sync on deck {self.inactive_deck}")
             elif self.beatmatch:
                 locked = await self.beatmatch.rephase(
                     self.inactive_deck, self.active_deck, timeout_s=5.0)
                 if not locked:
-                    print(f"   🎛  phase re-lock fell back to sync on deck {self.inactive_deck}")
+                    print(f"   [beatmatch] phase re-lock fell back to sync on deck {self.inactive_deck}")
 
             blend_start_ms = plan["blend_start_ms"] if plan else None
             if plan:
@@ -406,7 +406,7 @@ class QueueManager:
                 if remaining < bars * bar_ms:
                     bars = max(2, int(remaining // bar_ms))
                     blend_start_ms = None
-                    print(f"   ⏱  blend shortened to {bars} bars (late trigger)")
+                    print(f"   [pacing] blend shortened to {bars} bars (late trigger)")
 
             outcome = await self.performer.perform(
                 self.active_deck, self.inactive_deck, next_track,
@@ -422,7 +422,7 @@ class QueueManager:
         self.personality.record_outcome(outcome)
         self.report.transition(style, risk, outcome, sabotaged)
         if outcome.get("bailed"):
-            print(f"   🛟  recovery reflex bailed out of {style} (drift {outcome['max_drift']:.2f} beats)")
+            print(f"   [recovery] bailed out of {style} (drift {outcome['max_drift']:.2f} beats)")
             if self.announcer:
                 await self.announcer.say("gamble_loss", deck=self.inactive_deck)
         elif risk > 0.5 and self.announcer:
@@ -455,7 +455,7 @@ class QueueManager:
         )
         after = self.director.current_phase().get("name")
         if self.announcer and after != before:
-            print(f"   🎬  set phase → {after}")
+            print(f"   [phase] set phase -> {after}")
             if after == "peak":
                 await self.announcer.say("phase_peak", deck=self.active_deck)
             elif after in ("cooldown", "outro"):

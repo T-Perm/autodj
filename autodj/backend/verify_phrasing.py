@@ -39,7 +39,7 @@ def check_math():
     assert blend_bars_range("club", "hype") == (16, 32)
     assert clamp_blend_bars("party", "hype", 32) == 8
     assert clamp_blend_bars("club", "hype", 4) == 16
-    print("[math] phrase snap, pacing budgets, blend clamps — OK")
+    print("[math] phrase snap, pacing budgets, blend clamps - OK")
 
 
 
@@ -145,7 +145,7 @@ async def run_flow():
 
         paced = qm._mix_out_for(qm.now_playing, 300.0)
         assert 60000 <= paced <= 150000, f"party mix-out {paced}ms not early"
-        print(f"[pacing] party mix-out at {paced / 1000:.1f}s (analyzer said 270s) — OK")
+        print(f"[pacing] party mix-out at {paced / 1000:.1f}s (analyzer said 270s) - OK")
 
         plan = qm._blend_plan(300.0)
         assert plan is not None
@@ -170,7 +170,7 @@ async def run_flow():
         assert fired[0]["mix_out_ms"] == paced
         qm._begin_transition = real_begin
         print(f"[trigger] fires at {plan['trigger_ms'] / 1000:.1f}s for a "
-              f"{plan['bars']}-bar blend ending at mix-out {paced / 1000:.1f}s — OK")
+              f"{plan['bars']}-bar blend ending at mix-out {paced / 1000:.1f}s - OK")
 
         qm._schedule_preload()
         await asyncio.wait_for(qm._preload_task, timeout=60)
@@ -184,7 +184,7 @@ async def run_flow():
         assert entry - 8000 <= pos_ms <= entry + 2000, \
             f"deck B parked at {pos_ms:.0f}ms, entry point is {entry:.0f}ms"
         print(f"[preload] deck B loaded early, tempo err {bpm_err:.2f} BPM, "
-              f"parked at {pos_ms / 1000:.1f}s for entry {entry / 1000:.1f}s — OK")
+              f"parked at {pos_ms / 1000:.1f}s for entry {entry / 1000:.1f}s - OK")
 
         performed = {}
         async def fake_perform(a, b, next_track, style, bars, chaos,
@@ -212,7 +212,7 @@ async def run_flow():
         assert qm.active_deck == "B", "deck roles did not swap"
         assert not midi.sync_calls, "prepped path should not have hit beatsync"
         print(f"[transition] prepped fast path, {performed['bars']}-bar blend, "
-              f"no beatsync, decks swapped — OK")
+              f"no beatsync, decks swapped - OK")
     finally:
         tick.cancel()
         if qm._preload_task and not qm._preload_task.done():
@@ -248,7 +248,7 @@ def check_mix_timeline():
     assert pick_fallback_method(
         {"bpm": 90, "genre_hint": "hip-hop"},
         {"bpm": 140, "genre_hint": "techno"}) == "crossfader"
-    print("[mix_timeline] validation + fallback method selection — OK")
+    print("[mix_timeline] validation + fallback method selection - OK")
 
 
 
@@ -262,7 +262,7 @@ def assert_spine(midi: HarnessMidi, style: str, bars: int, bar_s: float,
         for prev, cur in zip(vals, vals[1:]):
             assert cur >= prev - 1e-6, f"{style}: crossfader moved backwards"
             assert cur - prev <= 0.15 + 1e-6, \
-                f"{style}: crossfader jumped {cur - prev:.2f} in one step — hard cut"
+                f"{style}: crossfader jumped {cur - prev:.2f} in one step - hard cut"
     else:
         peak = vals[0]
         assert 0.45 <= peak <= 0.55, \
@@ -287,12 +287,12 @@ def assert_spine(midi: HarnessMidi, style: str, bars: int, bar_s: float,
         t_in = next(t for t, v in xf if v > 0.1)
         t_out = next(t for t, v in xf if v >= 0.9)
         assert t_out - t_in >= build_bars * bar_s * 0.5, \
-            f"{style}: overlap only {t_out - t_in:.1f}s — decks barely coexisted"
+            f"{style}: overlap only {t_out - t_in:.1f}s - decks barely coexisted"
         t_end = next(t for t, v in xf if v >= 0.54)
         t_mid = xf[0][0] + (t_end - xf[0][0]) / 2
         v_mid = max(v for t, v in xf if t <= t_mid)
         assert v_mid <= 0.32, \
-            f"{style}: crossfader at {v_mid:.2f} halfway through the build — not eased"
+            f"{style}: crossfader at {v_mid:.2f} halfway through the build - not eased"
 
     a_vol = midi.vol_trace["A"]
     assert a_vol and a_vol[-1][1] <= 0.05, \
@@ -344,24 +344,24 @@ async def run_spine_case(style: str, bars: int = 4,
 async def run_spine_checks():
     await run_spine_case("beatmatch_crossfade", bars=4)
     print("[spine] clean blend: monotonic ramped crossfade, real overlap, "
-          "silent outgoing exit — OK")
+          "silent outgoing exit - OK")
 
     for style, cls in FLAVORS.items():
         if style == "beatmatch_crossfade":
             continue
         await run_spine_case(style, bars=4, blend_method=cls.blend_method)
-    print(f"[flavors] all {len(FLAVORS)} styles hold the fluidity invariants — OK")
+    print(f"[flavors] all {len(FLAVORS)} styles hold the fluidity invariants - OK")
 
     midi = await run_spine_case("beatmatch_crossfade", bars=8, bail_after_s=3.0)
     bail_t = 3.0
     steps_after = [v for t, v in midi.xf_trace if t > bail_t]
     assert len(steps_after) >= 5, "bail exit was not ramped"
-    print("[bail] recovery reflex exits through a ramp, never a slam — OK")
+    print("[bail] recovery reflex exits through a ramp, never a slam - OK")
 
     for method in ("eq_swap", "filter_blend"):
         await run_spine_case("beatmatch_crossfade", bars=8, blend_method=method)
     print("[blend_method] eq_swap/filter_blend park the crossfader until the "
-          "close phase — OK")
+          "close phase - OK")
 
     timeline = validate_timeline("eq_swap", [
         {"at_bar": 0.0, "move": "kill_bass", "deck": "a"},
@@ -371,7 +371,7 @@ async def run_spine_checks():
     ], duration_bars=8)
     await run_spine_case("beatmatch_crossfade", bars=8,
                          blend_method="eq_swap", moves=timeline)
-    print("[llm_timeline] validated move timeline holds the spine invariants — OK")
+    print("[llm_timeline] validated move timeline holds the spine invariants - OK")
 
 
 def main():

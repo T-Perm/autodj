@@ -14,7 +14,7 @@ def read_mixxx_id_map(mixxxdb_path: Path | None = None) -> dict[str, int]:
         raise FileNotFoundError(
             f"Mixxx library DB not found at {path}. "
             "Open Mixxx once and import your music folder "
-            "(Library → Add folder) so tracks get Mixxx ids."
+            "(Library -> Add folder) so tracks get Mixxx ids."
         )
 
     uri = f"file:{path.as_posix()}?mode=ro"

@@ -60,7 +60,7 @@ class Director:
             moods[t.get("mood", "?")] = moods.get(t.get("mood", "?"), 0) + 1
         bpms = [t.get("bpm") or 120 for t in library]
         summary = (f"{len(library)} tracks, BPM {min(bpms):.0f}-{max(bpms):.0f}, "
-                   f"moods: {', '.join(f'{k}×{v}' for k, v in sorted(moods.items()))}")
+                   f"moods: {', '.join(f'{k}x{v}' for k, v in sorted(moods.items()))}")
         try:
             plan = parse_json(await ask_llm(
                 PLAN_PROMPT, f"Library: {summary}\nVibe: {vibe}", temperature=0.9))
@@ -96,11 +96,11 @@ class Director:
 
     def directive_text(self) -> str:
         d = self.get_directive()
-        text = (f"Set phase: {d['phase']} — target energy {d['energy_target']:.1f} "
+        text = (f"Set phase: {d['phase']} - target energy {d['energy_target']:.1f} "
                 f"({d['note']})")
         if d["moment"]:
             text += (f"\nSCHEDULED MOMENT DUE: perform a {d['moment']['move']} "
-                     f"({d['moment'].get('why', '')}) — pick a track that sets it up.")
+                     f"({d['moment'].get('why', '')}) - pick a track that sets it up.")
         return text
 
 

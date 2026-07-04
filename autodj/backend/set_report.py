@@ -19,7 +19,7 @@ class SetReport:
         self.events.append(f"[{stamp}] {text}")
 
     def track(self, track: dict):
-        self.log(f"PLAYED: {track.get('artist')} — {track.get('title')} "
+        self.log(f"PLAYED: {track.get('artist')} - {track.get('title')} "
                  f"[{track.get('bpm', 0):.0f} BPM {track.get('key')}]")
 
     def transition(self, style: str, risk: float, outcome: dict, sabotaged: bool):
@@ -50,9 +50,9 @@ class SetReport:
             body = await ask_llm(RECAP_PROMPT.format(persona=persona), raw,
                                  temperature=0.9, max_tokens=800)
         except Exception:
-            body = (f"# Set journal — {persona.get('name', 'AutoDJ')}\n\n"
-                    f"*(LLM offline — raw journal)*\n\n```\n{raw}\n```")
+            body = (f"# Set journal - {persona.get('name', 'AutoDJ')}\n\n"
+                    f"*(LLM offline - raw journal)*\n\n```\n{raw}\n```")
 
         path.write_text(body, encoding="utf-8")
-        print(f"\n[report] Set recap written → {path}")
+        print(f"\n[report] Set recap written -> {path}")
         return path

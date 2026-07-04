@@ -38,7 +38,7 @@ def scan_library(music_dir: str) -> int:
             continue
         try:
             track = analyze_track(str(f))
-            label = f"{track.artist} — {track.title}  [{track.bpm:.1f} BPM | {track.key}]"
+            label = f"{track.artist} - {track.title}  [{track.bpm:.1f} BPM | {track.key}]"
             with Session(engine) as session:
                 session.add(track)
                 session.commit()
@@ -58,12 +58,12 @@ def scan_library(music_dir: str) -> int:
                 t.drop_ms = fresh.drop_ms
                 session.add(t)
                 session.commit()
-            print(f"  ~ beat grid: {old.artist} — {old.title}")
+            print(f"  ~ beat grid: {old.artist} - {old.title}")
         except Exception as e:
             print(f"  ! Beat-grid backfill failed {old.title}: {e}")
 
     total = len(existing_ids) + new_count
-    print(f"[scan] Done — {new_count} new, {total} total tracks in library\n")
+    print(f"[scan] Done - {new_count} new, {total} total tracks in library\n")
     return total
 
 
@@ -92,22 +92,22 @@ def build_library_index(midi) -> None:
             if mixxx_id is not None:
                 id_map[t.id] = mixxx_id
             else:
-                missing.append(f"{t.artist} — {t.title}")
+                missing.append(f"{t.artist} - {t.title}")
 
     midi.set_mixxx_id_map(id_map)
     print(f"[midi] Mixxx id map: {len(id_map)}/{len(tracks)} tracks resolved")
     if missing:
-        print(f"[midi] Not in Mixxx's library (import via Library → Add folder, then rescan):")
+        print(f"[midi] Not in Mixxx's library (import via Library -> Add folder, then rescan):")
         for name in missing[:10]:
             print(f"       - {name}")
         if len(missing) > 10:
-            print(f"       … and {len(missing) - 10} more")
+            print(f"       ... and {len(missing) - 10} more")
 
 
 
 async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
     if not sys.stdin.isatty():
-        print("   (headless mode — send SIGINT to stop)\n")
+        print("   (headless mode - send SIGINT to stop)\n")
         try:
             await asyncio.Event().wait()
         except (asyncio.CancelledError, KeyboardInterrupt):
@@ -136,7 +136,7 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
             if queue_mgr.now_playing:
                 t = queue_mgr.now_playing
                 bpm = t.get("bpm") or 0
-                print(f"\n▶  {t.get('artist')} — {t.get('title')}  [{bpm:.1f} BPM | {t.get('key')}]")
+                print(f"\n[now playing] {t.get('artist')} - {t.get('title')}  [{bpm:.1f} BPM | {t.get('key')}]")
                 print(f"   vibe: {queue_mgr.vibe}  |  deck: {queue_mgr.active_deck}")
                 for i, nxt in enumerate(queue_mgr.up_next[:3], 1):
                     print(f"   {i}. {nxt.get('title')}  [{nxt.get('transition_style')}]")
@@ -150,7 +150,7 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
                 vibe = "chaotic"
             if vibe in ("chill", "hype", "chaotic"):
                 queue_mgr.set_vibe(vibe)
-                print(f"   vibe → {vibe}")
+                print(f"   vibe -> {vibe}")
             else:
                 print("   usage: vibe chill | vibe hype | vibe chaos")
 
@@ -158,7 +158,7 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
             parts = line.split()
             mode = parts[1] if len(parts) > 1 else ""
             if queue_mgr.set_pace(mode):
-                print(f"   pace → {mode}")
+                print(f"   pace -> {mode}")
             else:
                 print("   usage: pace auto | club | party | full")
 
@@ -166,26 +166,26 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
             if queue_mgr.review_pending:
                 action = "skip" if line == "skip" else "go"
                 queue_mgr.review_respond(action)
-                print(f"   review → {action}")
+                print(f"   review -> {action}")
             elif line == "skip":
                 print("   skipping...")
                 asyncio.run_coroutine_threadsafe(queue_mgr.skip(), loop)
             else:
-                print("   usage: 'go' only resolves a pending review — nothing pending")
+                print("   usage: 'go' only resolves a pending review - nothing pending")
 
         elif line.startswith("cue"):
             parts = line.split()
             target = parts[1] if len(parts) > 1 else ""
             deck = {"a": "A", "b": "B"}.get(target)
             queue_mgr.cue(deck)
-            print(f"   headphone cue → {deck or 'off'}")
+            print(f"   headphone cue -> {deck or 'off'}")
 
         elif line.startswith("review"):
             parts = line.split()
             mode = parts[1] if len(parts) > 1 else ""
             if mode in ("on", "off"):
                 queue_mgr.set_review_mode(mode == "on")
-                print(f"   review mode → {mode}")
+                print(f"   review mode -> {mode}")
             else:
                 print("   usage: review on | review off")
 
@@ -194,7 +194,7 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
                 t = queue_mgr.now_playing
                 bpm = t.get("bpm") or 0
                 p = queue_mgr.personality.summary()
-                print(f"\n▶  {t.get('artist')} — {t.get('title')}  [{bpm:.1f} BPM | {t.get('key')}]")
+                print(f"\n[now playing] {t.get('artist')} - {t.get('title')}  [{bpm:.1f} BPM | {t.get('key')}]")
                 print(f"   vibe: {queue_mgr.vibe}  |  pace: {queue_mgr.pace_mode}"
                       f"  |  active deck: {queue_mgr.active_deck}"
                       f"  |  chaos: {p['chaos']}  |  boredom: {p['boredom']}"
@@ -204,11 +204,11 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
                     quality = queue_mgr.beatmatch.lock_quality(queue_mgr.inactive_deck)
                     if quality is not None:
                         print(f"   beatmatch deck {queue_mgr.inactive_deck}: "
-                              f"{'locked' if locked else 'matching…'}  (drift {quality:.3f} beats)")
+                              f"{'locked' if locked else 'matching...'}  (drift {quality:.3f} beats)")
                 if queue_mgr.up_next:
                     print("   up next:")
                     for i, nxt in enumerate(queue_mgr.up_next[:3], 1):
-                        print(f"     {i}. {nxt.get('artist')} — {nxt.get('title')}  [{nxt.get('transition_style')}]")
+                        print(f"     {i}. {nxt.get('artist')} - {nxt.get('title')}  [{nxt.get('transition_style')}]")
             else:
                 print("   (not playing yet)")
 
@@ -216,19 +216,19 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
             d = queue_mgr.director
             print(f"\n   set plan (track {d.tracks_played + 1}, phase: {d.current_phase().get('name')}):")
             for ph in d.plan.get("phases", []):
-                print(f"     {ph['name']:<10} {ph.get('tracks', '?')} tracks  energy {ph.get('energy', '?')}  — {ph.get('note', '')}")
+                print(f"     {ph['name']:<10} {ph.get('tracks', '?')} tracks  energy {ph.get('energy', '?')}  - {ph.get('note', '')}")
             for m in d.plan.get("moments", []):
-                mark = "✓" if m.get("done") else "…"
+                mark = "[done]" if m.get("done") else "[pending]"
                 print(f"     {mark} moment after track {m.get('after_track')}: {m.get('move')} ({m.get('why', '')})")
             if d.went_off_script:
                 print("   off-script:")
                 for s in d.went_off_script:
-                    print(f"     ⚠ {s}")
+                    print(f"     ! {s}")
 
         elif line == "persona":
             p = queue_mgr.personality.summary()
             per = p["persona"]
-            print(f"\n   🎧 {per.get('name')} — {per.get('style')}")
+            print(f"\n   {per.get('name')} - {per.get('style')}")
             print(f'   "{per.get("catchphrase", "")}"')
             print(f"   chaos: {p['chaos']}  |  gambles landed: {p['gambles_landed']}  |  botched: {p['gambles_botched']}")
 
@@ -244,12 +244,12 @@ async def terminal_loop(queue_mgr, loop: asyncio.AbstractEventLoop) -> None:
 
 async def main():
     print("=" * 60)
-    print("  AutoDJ × Mixxx")
+    print("  AutoDJ x Mixxx")
     print("=" * 60)
 
     total = scan_library(MUSIC_DIR)
     if total == 0:
-        print(f"No tracks found in {MUSIC_DIR} — add music files and restart.")
+        print(f"No tracks found in {MUSIC_DIR} - add music files and restart.")
         return
 
     from midi_controller import MidiController
@@ -273,7 +273,7 @@ async def main():
     )
     midi.set_state_callback(queue_mgr.on_mixxx_state)
 
-    print("\n[autodj] Starting — Mixxx is the interface\n")
+    print("\n[autodj] Starting - Mixxx is the interface\n")
     loop = asyncio.get_running_loop()
     asyncio.create_task(queue_mgr.start())
 
